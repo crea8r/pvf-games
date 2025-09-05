@@ -1,0 +1,172 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles for the Tetris Streamer App */
+
+/* Wallet adapter button customizations */
+.wallet-adapter-button {
+  @apply bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded transition-colors;
+}
+
+.wallet-adapter-button-trigger {
+  @apply bg-purple-600 hover:bg-purple-700;
+}
+
+/* Game board animations */
+.tetris-cell {
+  transition: all 0.1s ease-in-out;
+}
+
+.tetris-cell:hover {
+  transform: scale(1.05);
+}
+
+/* Custom scrollbar for transaction list */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-gray-800 rounded;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 rounded;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+
+/* Glowing effect for active elements */
+.glow-green {
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+.glow-purple {
+  box-shadow: 0 0 10px rgba(147, 51, 234, 0.5);
+}
+
+/* Pulse animation for live indicators */
+.pulse-live {
+  animation: pulse-live 2s infinite;
+}
+
+@keyframes pulse-live {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Game over overlay */
+.game-over-overlay {
+  backdrop-filter: blur(4px);
+}
+
+/* Responsive text sizing */
+@screen sm {
+  .text-responsive {
+    font-size: 0.875rem;
+  }
+}
+
+@screen md {
+  .text-responsive {
+    font-size: 1rem;
+  }
+}
+
+@screen lg {
+  .text-responsive {
+    font-size: 1.125rem;
+  }
+}
+
+/* Focus styles for accessibility */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  @apply ring-2 ring-purple-500 ring-offset-2 ring-offset-gray-900 outline-none;
+}
+
+/* Loading spinner */
+.spinner {
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #9333ea;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Gradient backgrounds */
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Piece preview styles */
+.piece-preview {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .mobile-hidden {
+    display: none;
+  }
+  
+  .mobile-stack {
+    flex-direction: column;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .bg-gray-800 {
+    @apply bg-black;
+  }
+  
+  .bg-gray-700 {
+    @apply bg-gray-900;
+  }
+  
+  .text-gray-400 {
+    @apply text-gray-200;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-bounce,
+  .transition-all,
+  .transition-colors {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none;
+  }
+}

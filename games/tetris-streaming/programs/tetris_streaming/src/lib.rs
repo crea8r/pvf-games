@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("CWsgKu8vFZkjjG1hpV9yBhuG6qYmBjdx2m9PzyLviNTM");
+declare_id!("4axrKjG14aHD1MZEQUKZdCmptv3xiojyCpEm4PHbSLUZ");
 
 #[program]
 pub mod tetris_streaming {
