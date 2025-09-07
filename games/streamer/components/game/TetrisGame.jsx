@@ -14,7 +14,7 @@ import {
 } from '../../lib/tetris';
 import { fetchRoomData, getPieceFromBlockchain } from '../../lib/solana';
 
-const TetrisGame = ({ selectedRoom, isRoomClaimed }) => {
+const TetrisGame = ({ selectedRoom, isRoomClaimed, gameMode = 'normal', onGameStarted }) => {
   const [board, setBoard] = useState(createBoard());
   const [currentPiece, setCurrentPiece] = useState(null);
   const [nextPieceType, setNextPieceType] = useState(getRandomPieceType());
@@ -36,10 +36,13 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed }) => {
   const initializeGame = useCallback(() => {
     const newBoard = createBoard();
     const firstPieceType = getRandomPieceType();
+    const newNextPieceType = getRandomPieceType();
     const firstPiece = createPieceState(firstPieceType);
     
     setBoard(newBoard);
     setCurrentPiece(firstPiece);
+    setNextPieceType(newNextPieceType);
+    setNextPieceFromBlockchain(false);
     setScore(0);
     setLines(0);
     setLevel(1);
@@ -59,8 +62,9 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed }) => {
     }
     
     setCurrentPiece(newPiece);
-    // Next piece will be set by blockchain polling or random fallback
-    setNextPieceType(getRandomPieceType());
+    // Generate next piece (will be overridden by blockchain if available)
+    const newNextPieceType = getRandomPieceType();
+    setNextPieceType(newNextPieceType);
     setNextPieceFromBlockchain(false);
   }, [board, nextPieceType]);
 
@@ -148,23 +152,28 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed }) => {
 
   // Blockchain polling
   const pollBlockchain = useCallback(async () => {
-    if (!selectedRoom || !isRoomClaimed) return;
+    if (gameMode !== 'streamer' || selectedRoom === null || !isRoomClaimed || gameOver) return;
     
+    console.log('Polling blockchain for room:', selectedRoom);
     try {
       const data = await fetchRoomData(selectedRoom);
+      console.log('Fetched room data:', data);
       setRoomData(data);
       
-      if (data.latest_chosen_piece !== undefined) {
+      if (data.latest_chosen_piece !== undefined && data.latest_chosen_piece !== null) {
         const blockchainPieceType = getPieceFromBlockchain(data.latest_chosen_piece);
-        if (blockchainPieceType !== nextPieceType) {
+        // Update next piece if we have a valid blockchain piece and it's different
+        if (blockchainPieceType && blockchainPieceType !== nextPieceType) {
           setNextPieceType(blockchainPieceType);
           setNextPieceFromBlockchain(true);
+          console.log('Updated next piece from blockchain:', blockchainPieceType);
         }
       }
     } catch (error) {
       console.error('Error polling blockchain:', error);
+      // Don't clear the next piece on error, keep existing one
     }
-  }, [selectedRoom, isRoomClaimed, nextPieceType]);
+  }, [selectedRoom, isRoomClaimed, gameMode, nextPieceType, gameOver]);
 
   // Keyboard controls
   const handleKeyPress = useCallback((event) => {
@@ -177,24 +186,24 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed }) => {
     
     switch (event.key.toLowerCase()) {
       case 'arrowleft':
-      case 'a':
+      // case 'a':
         event.preventDefault();
         movePiece(-1, 0);
         break;
       case 'arrowright':
-      case 'd':
+      // case 'd':
         event.preventDefault();
         movePiece(1, 0);
         break;
       case 'arrowdown':
-      case 's':
+      // case 's':
         event.preventDefault();
         if (movePiece(0, 1)) {
           setScore(prev => prev + 1);
         }
         break;
       case 'arrowup':
-      case 'w':
+      // case 'w':
         event.preventDefault();
         rotatePieceHandler();
         break;
@@ -202,14 +211,14 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed }) => {
         event.preventDefault();
         hardDrop();
         break;
-      case 'p':
-        setIsPaused(prev => !prev);
-        break;
-      case 'r':
-        if (gameOver) {
-          initializeGame();
-        }
-        break;
+      // case 'p':
+      //   setIsPaused(prev => !prev);
+      //   break;
+      // case 'r':
+      //   if (gameOver) {
+      //     initializeGame();
+      //   }
+      //   break;
     }
   }, [gameStarted, movePiece, rotatePieceHandler, hardDrop, gameOver, initializeGame]);
 
@@ -220,17 +229,30 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed }) => {
   }, [gameLoop]);
 
   useEffect(() => {
-    if (selectedRoom !== null && isRoomClaimed) {
+    if (gameMode === 'streamer' && selectedRoom !== null && isRoomClaimed) {
+      console.log('Starting blockchain polling for room:', selectedRoom);
       blockchainPollRef.current = setInterval(pollBlockchain, 2000);
-      return () => clearInterval(blockchainPollRef.current);
+      // Call immediately once
+      pollBlockchain();
+      return () => {
+        console.log('Stopping blockchain polling');
+        clearInterval(blockchainPollRef.current);
+      };
     }
-  }, [pollBlockchain, selectedRoom, isRoomClaimed]);
+  }, [pollBlockchain, selectedRoom, isRoomClaimed, gameMode]);
 
   // Event listeners
   useEffect(() => {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [handleKeyPress]);
+
+  // Notify parent of game state changes
+  useEffect(() => {
+    if (onGameStarted) {
+      onGameStarted(gameStarted);
+    }
+  }, [gameStarted, onGameStarted]);
 
   // Initialize first piece when game starts
   useEffect(() => {
@@ -239,81 +261,85 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed }) => {
     }
   }, [gameStarted, currentPiece, gameOver, spawnNewPiece]);
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Game Stats */}
-      <div className="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-600">
-        <div className="grid grid-cols-4 gap-4 text-center">
-          <div>
-            <div className="text-gray-400 text-xs">Score</div>
-            <div className="text-white font-mono text-lg">{score.toLocaleString()}</div>
-          </div>
-          <div>
-            <div className="text-gray-400 text-xs">Lines</div>
-            <div className="text-white font-mono text-lg">{lines}</div>
-          </div>
-          <div>
-            <div className="text-gray-400 text-xs">Level</div>
-            <div className="text-white font-mono text-lg">{level}</div>
-          </div>
-          <div>
-            <div className="text-gray-400 text-xs">Status</div>
-            <div className="text-white text-sm">
-              {gameOver ? 'Game Over' : isPaused ? 'Paused' : gameStarted ? 'Playing' : 'Ready'}
-            </div>
-          </div>
-        </div>
-      </div>
+  // Ensure next piece is always set
+  useEffect(() => {
+    if (gameStarted && !nextPieceType) {
+      setNextPieceType(getRandomPieceType());
+      setNextPieceFromBlockchain(false);
+    }
+  }, [gameStarted, nextPieceType]);
 
+  const isNormalMode = gameMode === 'normal';
+
+  return (
+    <div className={`flex ${isNormalMode ? 'flex-col items-center' : 'h-full'}`}>
       {/* Game Board and Next Piece */}
-      <div className="flex gap-4 flex-1">
-        <div className="flex-1 flex justify-center">
+      <div className={`flex gap-4 ${isNormalMode ? 'items-start' : 'flex-1 items-start'}`}>
+        <div className={`flex ${isNormalMode ? 'justify-center' : 'flex-1 justify-center'} relative`}>
           <GameBoard 
             board={board} 
             currentPiece={currentPiece} 
             gameOver={gameOver} 
           />
+          
+          {/* Start Game Overlay */}
+          {!gameStarted && (
+            <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center rounded-lg">
+              <div className="text-center">
+                <div className="text-white text-xl font-bold mb-2">
+                  {gameOver ? 'Game Over!' : 'Tetris'}
+                </div>
+                <div className="text-gray-300 text-sm">
+                  Press SPACE or ENTER to start
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         
-        <div className="w-32">
+        <div className="w-40">
           <NextPiece 
             pieceType={nextPieceType} 
             fromBlockchain={nextPieceFromBlockchain}
           />
           
-          {/* Blockchain Info */}
-          {roomData && (
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-600 mt-4">
-              <h3 className="text-white text-sm font-semibold mb-2">Room Info</h3>
+          {/* Blockchain Info - only in streamer mode */}
+          {gameMode === 'streamer' && (
+            <div className="bg-gray-800 p-3 rounded-lg border border-gray-600 mt-3">
+              <h3 className="text-white text-xs font-semibold mb-2">Room Info</h3>
               <div className="text-xs text-gray-400 space-y-1">
-                <div>Last Buyer:</div>
-                <div className="text-white font-mono text-xs break-all">
-                  {roomData.last_buyer ? 
-                    `${roomData.last_buyer.slice(0, 8)}...` : 
-                    'None'
-                  }
-                </div>
-                <div className="text-gray-400">
-                  {new Date(roomData.timestamp).toLocaleTimeString()}
-                </div>
+                {!roomData ? (
+                  <div className="text-yellow-400">Loading room data...</div>
+                ) : (
+                  <>
+                    <div>Last Buyer:</div>
+                    <div className="text-white font-mono text-xs break-all">
+                      {roomData.last_buyer ? 
+                        `${roomData.last_buyer.slice(0, 8)}...` : 
+                        'None'
+                      }
+                    </div>
+                    <div className="text-gray-400">
+                      Latest Piece: {roomData.latest_chosen_piece !== null ? 
+                        getPieceFromBlockchain(roomData.latest_chosen_piece) : 'None'}
+                    </div>
+                    <div className="text-gray-400">
+                      Exists: {roomData.exists ? 'Yes' : 'No'}
+                    </div>
+                    <div className="text-gray-400">
+                      {roomData.timestamp ? 
+                        new Date(roomData.timestamp * 1000).toLocaleTimeString() : 
+                        'No timestamp'
+                      }
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Controls Help */}
-      <div className="bg-gray-800 p-3 rounded-lg mt-4 border border-gray-600">
-        <div className="text-gray-400 text-xs text-center">
-          {!gameStarted ? (
-            <span>Press SPACE or ENTER to start</span>
-          ) : (
-            <span>
-              ← → Move | ↑ Rotate | ↓ Soft Drop | SPACE Hard Drop | P Pause | R Restart
-            </span>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

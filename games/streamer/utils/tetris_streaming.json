@@ -1,0 +1,315 @@
+{
+  "address": "FHbWQGzgrdKnuZcp4bLhE2GdwzxrGciWKUegW42yj33h",
+  "metadata": {
+    "name": "tetris_streaming",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "choose_piece",
+      "discriminator": [
+        30,
+        228,
+        132,
+        255,
+        245,
+        54,
+        193,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "streamer",
+          "writable": true
+        },
+        {
+          "name": "dev_wallet",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "u8"
+        },
+        {
+          "name": "piece_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "claim_room",
+      "discriminator": [
+        62,
+        51,
+        97,
+        121,
+        144,
+        160,
+        43,
+        85
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "room_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "streamer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "room_id",
+          "type": "u8"
+        },
+        {
+          "name": "room_name",
+          "type": "string"
+        },
+        {
+          "name": "stream_url",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "dev_wallet",
+          "type": "pubkey"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "Room",
+      "discriminator": [
+        156,
+        199,
+        67,
+        27,
+        222,
+        23,
+        185,
+        94
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidRoomId",
+      "msg": "Invalid room ID. Must be 0-9."
+    },
+    {
+      "code": 6001,
+      "name": "RoomNameTooLong",
+      "msg": "Room name too long. Max 50 characters."
+    },
+    {
+      "code": 6002,
+      "name": "StreamUrlTooLong",
+      "msg": "Stream URL too long. Max 200 characters."
+    },
+    {
+      "code": 6003,
+      "name": "InvalidPieceType",
+      "msg": "Invalid piece type. Must be 0-6."
+    },
+    {
+      "code": 6004,
+      "name": "InvalidStreamer",
+      "msg": "Only the room owner can receive payments."
+    },
+    {
+      "code": 6005,
+      "name": "InvalidDevWallet",
+      "msg": "Invalid dev wallet."
+    },
+    {
+      "code": 6006,
+      "name": "RoomNotExpired",
+      "msg": "Room is not expired yet. Wait 2 minutes before reclaiming."
+    }
+  ],
+  "types": [
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dev_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "piece_price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Room",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room_name",
+            "type": "string"
+          },
+          {
+            "name": "stream_url",
+            "type": "string"
+          },
+          {
+            "name": "player_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "latest_chosen_piece",
+            "type": "u8"
+          },
+          {
+            "name": "last_buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

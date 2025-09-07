@@ -5,7 +5,13 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-tetris_streaming = "CWsgKu8vFZkjjG1hpV9yBhuG6qYmBjdx2m9PzyLviNTM"
+tetris_streaming = "FHbWQGzgrdKnuZcp4bLhE2GdwzxrGciWKUegW42yj33h"
+
+[programs.devnet]
+tetris_streaming = "FHbWQGzgrdKnuZcp4bLhE2GdwzxrGciWKUegW42yj33h"
+
+[programs.mainnet]
+tetris_streaming = "FHbWQGzgrdKnuZcp4bLhE2GdwzxrGciWKUegW42yj33h"
 
 [registry]
 url = "https://api.apr.dev"

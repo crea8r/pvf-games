@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("4axrKjG14aHD1MZEQUKZdCmptv3xiojyCpEm4PHbSLUZ");
+declare_id!("FHbWQGzgrdKnuZcp4bLhE2GdwzxrGciWKUegW42yj33h");
 
 #[program]
 pub mod tetris_streaming {
@@ -26,12 +26,20 @@ pub mod tetris_streaming {
         require!(stream_url.len() <= 200, ErrorCode::StreamUrlTooLong);
 
         let room = &mut ctx.accounts.room;
+        let current_time = Clock::get()?.unix_timestamp;
+        
+        // If room already exists, check if it's expired (2+ minutes old)
+        if room.timestamp != 0 {
+            let time_diff = current_time - room.timestamp;
+            require!(time_diff >= 120, ErrorCode::RoomNotExpired); // 120 seconds = 2 minutes
+        }
+        
         room.room_name = room_name;
         room.stream_url = stream_url;
         room.player_wallet = ctx.accounts.streamer.key();
         room.latest_chosen_piece = 0; // Default to first piece (I-piece)
         room.last_buyer = Pubkey::default();
-        room.timestamp = Clock::get()?.unix_timestamp;
+        room.timestamp = current_time;
 
         Ok(())
     }
@@ -48,6 +56,7 @@ pub mod tetris_streaming {
         let room = &mut ctx.accounts.room;
         
         // Transfer SOL: 70% to streamer, 30% to dev
+        msg!("piece price: {}",config.piece_price);
         let streamer_amount = (config.piece_price * 70) / 100;
         let dev_amount = config.piece_price - streamer_amount;
 
@@ -79,7 +88,8 @@ pub mod tetris_streaming {
         room.latest_chosen_piece = piece_type;
         room.last_buyer = ctx.accounts.buyer.key();
         room.timestamp = Clock::get()?.unix_timestamp;
-
+        msg!("next piece: {}",room.latest_chosen_piece);
+        msg!("last_buyer: {}",ctx.accounts.buyer.key());
         Ok(())
     }
 }
@@ -104,7 +114,7 @@ pub struct Initialize<'info> {
 #[instruction(room_id: u8)]
 pub struct ClaimRoom<'info> {
     #[account(
-        init,
+        init_if_needed,
         payer = streamer,
         space = 8 + 50 + 200 + 32 + 1 + 32 + 8, // discriminator + room_name + stream_url + player_wallet + piece + last_buyer + timestamp
         seeds = [b"room", room_id.to_le_bytes().as_ref()],
@@ -181,4 +191,6 @@ pub enum ErrorCode {
     InvalidStreamer,
     #[msg("Invalid dev wallet.")]
     InvalidDevWallet,
+    #[msg("Room is not expired yet. Wait 2 minutes before reclaiming.")]
+    RoomNotExpired,
 }

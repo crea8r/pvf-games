@@ -24,13 +24,25 @@ describe("tetris_streaming", () => {
     buyer = Keypair.generate();
 
     // Airdrop SOL to test accounts
-    await provider.connection.requestAirdrop(authority.publicKey, 2 * LAMPORTS_PER_SOL);
-    await provider.connection.requestAirdrop(streamer.publicKey, 2 * LAMPORTS_PER_SOL);
-    await provider.connection.requestAirdrop(buyer.publicKey, 2 * LAMPORTS_PER_SOL);
-    await provider.connection.requestAirdrop(devWallet.publicKey, 1 * LAMPORTS_PER_SOL);
+    await provider.connection.requestAirdrop(
+      authority.publicKey,
+      2 * LAMPORTS_PER_SOL
+    );
+    await provider.connection.requestAirdrop(
+      streamer.publicKey,
+      2 * LAMPORTS_PER_SOL
+    );
+    await provider.connection.requestAirdrop(
+      buyer.publicKey,
+      2 * LAMPORTS_PER_SOL
+    );
+    await provider.connection.requestAirdrop(
+      devWallet.publicKey,
+      1 * LAMPORTS_PER_SOL
+    );
 
     // Wait for airdrops to complete
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Derive PDAs
     [configPDA] = PublicKey.findProgramAddressSync(
@@ -52,12 +64,14 @@ describe("tetris_streaming", () => {
           config: configPDA,
           authority: authority.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
-        })
+        } as any)
         .signers([authority])
         .rpc();
 
       const config = await program.account.config.fetch(configPDA);
-      expect(config.devWallet.toString()).to.equal(devWallet.publicKey.toString());
+      expect(config.devWallet.toString()).to.equal(
+        devWallet.publicKey.toString()
+      );
       expect(config.piecePrice.toNumber()).to.equal(1_000_000);
     });
 
@@ -69,7 +83,7 @@ describe("tetris_streaming", () => {
             config: configPDA,
             authority: authority.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-          })
+          } as any)
           .signers([authority])
           .rpc();
         expect.fail("Should have failed");
@@ -90,14 +104,16 @@ describe("tetris_streaming", () => {
           room: roomPDA,
           streamer: streamer.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
-        })
+        } as any)
         .signers([streamer])
         .rpc();
 
       const room = await program.account.room.fetch(roomPDA);
       expect(room.roomName).to.equal(roomName);
       expect(room.streamUrl).to.equal(streamUrl);
-      expect(room.playerWallet.toString()).to.equal(streamer.publicKey.toString());
+      expect(room.playerWallet.toString()).to.equal(
+        streamer.publicKey.toString()
+      );
       expect(room.latestChosenPiece).to.equal(0);
       expect(room.lastBuyer.toString()).to.equal(PublicKey.default.toString());
     });
@@ -114,7 +130,7 @@ describe("tetris_streaming", () => {
             )[0],
             streamer: streamer.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-          })
+          } as any)
           .signers([streamer])
           .rpc();
         expect.fail("Should have failed");
@@ -135,7 +151,7 @@ describe("tetris_streaming", () => {
             )[0],
             streamer: streamer.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-          })
+          } as any)
           .signers([streamer])
           .rpc();
         expect.fail("Should have failed");
@@ -156,7 +172,7 @@ describe("tetris_streaming", () => {
             )[0],
             streamer: streamer.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-          })
+          } as any)
           .signers([streamer])
           .rpc();
         expect.fail("Should have failed");
@@ -171,9 +187,15 @@ describe("tetris_streaming", () => {
       const pieceType = 3; // S-piece
 
       // Get initial balances
-      const streamerBalanceBefore = await provider.connection.getBalance(streamer.publicKey);
-      const devBalanceBefore = await provider.connection.getBalance(devWallet.publicKey);
-      const buyerBalanceBefore = await provider.connection.getBalance(buyer.publicKey);
+      const streamerBalanceBefore = await provider.connection.getBalance(
+        streamer.publicKey
+      );
+      const devBalanceBefore = await provider.connection.getBalance(
+        devWallet.publicKey
+      );
+      const buyerBalanceBefore = await provider.connection.getBalance(
+        buyer.publicKey
+      );
 
       const tx = await program.methods
         .choosePiece(roomId, pieceType)
@@ -184,14 +206,20 @@ describe("tetris_streaming", () => {
           streamer: streamer.publicKey,
           devWallet: devWallet.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
-        })
+        } as any)
         .signers([buyer])
         .rpc();
 
       // Get final balances
-      const streamerBalanceAfter = await provider.connection.getBalance(streamer.publicKey);
-      const devBalanceAfter = await provider.connection.getBalance(devWallet.publicKey);
-      const buyerBalanceAfter = await provider.connection.getBalance(buyer.publicKey);
+      const streamerBalanceAfter = await provider.connection.getBalance(
+        streamer.publicKey
+      );
+      const devBalanceAfter = await provider.connection.getBalance(
+        devWallet.publicKey
+      );
+      const buyerBalanceAfter = await provider.connection.getBalance(
+        buyer.publicKey
+      );
 
       // Check room state
       const room = await program.account.room.fetch(roomPDA);
@@ -202,11 +230,15 @@ describe("tetris_streaming", () => {
       const expectedStreamerAmount = 700_000; // 70% of 1_000_000
       const expectedDevAmount = 300_000; // 30% of 1_000_000
 
-      expect(streamerBalanceAfter - streamerBalanceBefore).to.equal(expectedStreamerAmount);
+      expect(streamerBalanceAfter - streamerBalanceBefore).to.equal(
+        expectedStreamerAmount
+      );
       expect(devBalanceAfter - devBalanceBefore).to.equal(expectedDevAmount);
-      
+
       // Buyer should have paid at least the full amount (may include transaction fees)
-      expect(buyerBalanceBefore - buyerBalanceAfter).to.be.greaterThanOrEqual(1_000_000);
+      expect(buyerBalanceBefore - buyerBalanceAfter).to.be.greaterThanOrEqual(
+        1_000_000
+      );
     });
 
     it("should fail with invalid room id", async () => {
@@ -224,7 +256,7 @@ describe("tetris_streaming", () => {
             streamer: streamer.publicKey,
             devWallet: devWallet.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-          })
+          } as any)
           .signers([buyer])
           .rpc();
         expect.fail("Should have failed");
@@ -245,7 +277,7 @@ describe("tetris_streaming", () => {
             streamer: streamer.publicKey,
             devWallet: devWallet.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-          })
+          } as any)
           .signers([buyer])
           .rpc();
         expect.fail("Should have failed");
@@ -256,8 +288,11 @@ describe("tetris_streaming", () => {
 
     it("should fail with wrong streamer wallet", async () => {
       const wrongStreamer = Keypair.generate();
-      await provider.connection.requestAirdrop(wrongStreamer.publicKey, 1 * LAMPORTS_PER_SOL);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await provider.connection.requestAirdrop(
+        wrongStreamer.publicKey,
+        1 * LAMPORTS_PER_SOL
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       try {
         await program.methods
@@ -269,7 +304,7 @@ describe("tetris_streaming", () => {
             streamer: wrongStreamer.publicKey,
             devWallet: devWallet.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-          })
+          } as any)
           .signers([buyer])
           .rpc();
         expect.fail("Should have failed");
@@ -280,8 +315,11 @@ describe("tetris_streaming", () => {
 
     it("should fail with wrong dev wallet", async () => {
       const wrongDevWallet = Keypair.generate();
-      await provider.connection.requestAirdrop(wrongDevWallet.publicKey, 1 * LAMPORTS_PER_SOL);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await provider.connection.requestAirdrop(
+        wrongDevWallet.publicKey,
+        1 * LAMPORTS_PER_SOL
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       try {
         await program.methods
@@ -293,7 +331,7 @@ describe("tetris_streaming", () => {
             streamer: streamer.publicKey,
             devWallet: wrongDevWallet.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-          })
+          } as any)
           .signers([buyer])
           .rpc();
         expect.fail("Should have failed");
@@ -316,7 +354,7 @@ describe("tetris_streaming", () => {
             streamer: streamer.publicKey,
             devWallet: devWallet.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-          })
+          } as any)
           .signers([buyer])
           .rpc();
 
@@ -329,8 +367,11 @@ describe("tetris_streaming", () => {
   describe("edge cases and integration", () => {
     it("should handle multiple room claims", async () => {
       const streamer2 = Keypair.generate();
-      await provider.connection.requestAirdrop(streamer2.publicKey, 2 * LAMPORTS_PER_SOL);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await provider.connection.requestAirdrop(
+        streamer2.publicKey,
+        2 * LAMPORTS_PER_SOL
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const roomId2 = 5;
       const [roomPDA2] = PublicKey.findProgramAddressSync(
@@ -344,18 +385,20 @@ describe("tetris_streaming", () => {
           room: roomPDA2,
           streamer: streamer2.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
-        })
+        } as any)
         .signers([streamer2])
         .rpc();
 
       const room2 = await program.account.room.fetch(roomPDA2);
       expect(room2.roomName).to.equal("Second Room");
-      expect(room2.playerWallet.toString()).to.equal(streamer2.publicKey.toString());
+      expect(room2.playerWallet.toString()).to.equal(
+        streamer2.publicKey.toString()
+      );
     });
 
     it("should preserve timestamp accuracy", async () => {
       const beforeTime = Math.floor(Date.now() / 1000);
-      
+
       await program.methods
         .choosePiece(roomId, 2)
         .accounts({
@@ -365,15 +408,107 @@ describe("tetris_streaming", () => {
           streamer: streamer.publicKey,
           devWallet: devWallet.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
-        })
+        } as any)
         .signers([buyer])
         .rpc();
 
       const afterTime = Math.floor(Date.now() / 1000);
       const room = await program.account.room.fetch(roomPDA);
-      
-      expect(room.timestamp.toNumber()).to.be.greaterThanOrEqual(beforeTime - 5);
+
+      expect(room.timestamp.toNumber()).to.be.greaterThanOrEqual(
+        beforeTime - 5
+      );
       expect(room.timestamp.toNumber()).to.be.lessThanOrEqual(afterTime + 5);
+    });
+
+    it("should allow reclaiming room after 2 minutes expiry", async () => {
+      const streamer3 = Keypair.generate();
+      await provider.connection.requestAirdrop(
+        streamer3.publicKey,
+        2 * LAMPORTS_PER_SOL
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const roomId3 = 6;
+      const [roomPDA3] = PublicKey.findProgramAddressSync(
+        [Buffer.from("room"), Buffer.from([roomId3])],
+        program.programId
+      );
+
+      // First claim
+      await program.methods
+        .claimRoom(roomId3, "First Claim", "https://first.com")
+        .accounts({
+          room: roomPDA3,
+          streamer: streamer.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        } as any)
+        .signers([streamer])
+        .rpc();
+
+      // Try to claim immediately (should fail)
+      try {
+        await program.methods
+          .claimRoom(roomId3, "Immediate Reclaim", "https://immediate.com")
+          .accounts({
+            room: roomPDA3,
+            streamer: streamer3.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          } as any)
+          .signers([streamer3])
+          .rpc();
+        expect.fail("Should have failed");
+      } catch (error) {
+        expect(error.message).to.include("Room is not expired yet");
+      }
+
+      const room3 = await program.account.room.fetch(roomPDA3);
+      expect(room3.roomName).to.equal("First Claim");
+      expect(room3.playerWallet.toString()).to.equal(
+        streamer.publicKey.toString()
+      );
+    });
+
+    it("should prevent reclaiming unexpired room", async () => {
+      const streamer4 = Keypair.generate();
+      await provider.connection.requestAirdrop(
+        streamer4.publicKey,
+        2 * LAMPORTS_PER_SOL
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const roomId4 = 7;
+      const [roomPDA4] = PublicKey.findProgramAddressSync(
+        [Buffer.from("room"), Buffer.from([roomId4])],
+        program.programId
+      );
+
+      // First claim
+      await program.methods
+        .claimRoom(roomId4, "Active Room", "https://active.com")
+        .accounts({
+          room: roomPDA4,
+          streamer: streamer.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        } as any)
+        .signers([streamer])
+        .rpc();
+
+      // Try to claim before expiry
+      try {
+        await program.methods
+          .claimRoom(roomId4, "Steal Room", "https://steal.com")
+          .accounts({
+            room: roomPDA4,
+            streamer: streamer4.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          } as any)
+          .signers([streamer4])
+          .rpc();
+        expect.fail("Should have failed");
+      } catch (error) {
+        expect(error.message).to.include("Room is not expired yet");
+      }
     });
   });
 });

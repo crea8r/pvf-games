@@ -1,6 +1,6 @@
 // Tetris game constants
-export const BOARD_WIDTH = 10;
-export const BOARD_HEIGHT = 20;
+export const BOARD_WIDTH = 15;
+export const BOARD_HEIGHT = 16;
 
 // Tetris pieces definitions
 export const PIECES = {
@@ -54,7 +54,8 @@ export const PIECES = {
 
 // Create empty board
 export function createBoard() {
-  return Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+  const b = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+  return b;
 }
 
 // Rotate piece 90 degrees clockwise

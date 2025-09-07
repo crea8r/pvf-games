@@ -1,15 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { claimRoom, getAvailableRooms, ROOMS_COUNT } from '../../lib/solana';
+import { claimRoom, getAvailableRooms, ROOMS_COUNT, isAppInitialized, DEV_WALLET } from '../../lib/solana';
+import { getRoomExpirationStatus } from '../../utils/roomExpiration';
+import { createInitializeInstruction } from '../../utils/createInitializeInstruction';
+import programHook from '../../utils/program';
+import { Transaction } from '@solana/web3.js';
+import * as anchor from '@coral-xyz/anchor';
 
 const RoomSelector = ({ selectedRoom, setSelectedRoom, isRoomClaimed, setIsRoomClaimed }) => {
   const wallet = useWallet();
+  const { connection } = useConnection();
+  const { sendTransaction } = useWallet();
   const [rooms, setRooms] = useState([]);
   const [roomName, setRoomName] = useState('');
   const [streamUrl, setStreamUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [claimingRoom, setClaimingRoom] = useState(false);
+  const [appInitialized, setAppInitialized] = useState(null);
+  const [initializing, setInitializing] = useState(false);
+
+  // Check if app is initialized
+  useEffect(() => {
+    const checkInitialization = async () => {
+      try {
+        const initialized = await isAppInitialized();
+        setAppInitialized(initialized);
+      } catch (error) {
+        console.error('Error checking app initialization:', error);
+        setAppInitialized(false);
+      }
+    };
+
+    checkInitialization();
+  }, []);
 
   // Load available rooms
   useEffect(() => {
@@ -33,10 +57,13 @@ const RoomSelector = ({ selectedRoom, setSelectedRoom, isRoomClaimed, setIsRoomC
       setLoading(false);
     };
 
-    loadRooms();
-    const interval = setInterval(loadRooms, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
+    // Only load rooms if app is initialized
+    if (appInitialized) {
+      loadRooms();
+      const interval = setInterval(loadRooms, 30000); // Refresh every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [appInitialized]);
 
   // Check if user owns the selected room
   useEffect(() => {
@@ -56,8 +83,8 @@ const RoomSelector = ({ selectedRoom, setSelectedRoom, isRoomClaimed, setIsRoomC
     }
 
     const room = rooms[selectedRoom];
-    if (room?.exists) {
-      alert('Room is already claimed');
+    if (room?.exists && !room?.expired) {
+      alert('Room is already claimed and not expired');
       return;
     }
 
@@ -67,17 +94,20 @@ const RoomSelector = ({ selectedRoom, setSelectedRoom, isRoomClaimed, setIsRoomC
       
       // Update room data
       const updatedRooms = [...rooms];
+      const wasReclaiming = updatedRooms[selectedRoom]?.expired;
       updatedRooms[selectedRoom] = {
         ...updatedRooms[selectedRoom],
         exists: true,
         room_name: roomName.trim(),
         stream_url: streamUrl.trim(),
-        owner: wallet.publicKey.toString()
+        owner: wallet.publicKey.toString(),
+        expired: false,
+        timestamp: Math.floor(Date.now() / 1000)
       };
       setRooms(updatedRooms);
       setIsRoomClaimed(true);
       
-      alert('Room claimed successfully!');
+      alert(wasReclaiming ? 'Room reclaimed successfully!' : 'Room claimed successfully!');
     } catch (error) {
       console.error('Error claiming room:', error);
       alert('Failed to claim room: ' + error.message);
@@ -85,15 +115,59 @@ const RoomSelector = ({ selectedRoom, setSelectedRoom, isRoomClaimed, setIsRoomC
     setClaimingRoom(false);
   };
 
+  const handleInitializeApp = async () => {
+    if (!wallet || !wallet.connected || !wallet.publicKey) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    setInitializing(true);
+    try {
+      console.log('Initializing app...');
+      console.log('wallet:', wallet);
+      console.log('wallet.publicKey:', wallet.publicKey?.toBase58());
+      
+      const program = programHook(connection);
+      const ix = await createInitializeInstruction(
+        program,
+        DEV_WALLET,
+        wallet.publicKey
+      );
+
+      const tx = new Transaction().add(ix);
+      console.log('Transaction created:', tx);
+      
+      // Sign and send the transaction using the sendTransaction from useWallet
+      const signature = await sendTransaction(tx, connection, {
+        skipPreflight: true
+      });
+      console.log('Transaction signature:', signature);
+      
+      // Wait for confirmation
+      await connection.confirmTransaction(signature, 'confirmed');
+      console.log('Transaction confirmed');
+      
+      // Update initialization status
+      setAppInitialized(true);
+      alert('App initialized successfully!');
+    } catch (error) {
+      console.error('Error initializing app:', error);
+      alert('Failed to initialize app: ' + (error.message || error.toString()));
+    }
+    setInitializing(false);
+  };
+
   const getRoomStatus = (room) => {
     if (!room.exists) return 'Available';
     if (room.owner === wallet.publicKey?.toString()) return 'Owned by you';
+    if (room.expired) return 'Expired (Claimable)';
     return 'Claimed';
   };
 
   const getRoomStatusColor = (room) => {
     if (!room.exists) return 'text-green-400';
     if (room.owner === wallet.publicKey?.toString()) return 'text-blue-400';
+    if (room.expired) return 'text-yellow-400';
     return 'text-red-400';
   };
 
@@ -112,30 +186,59 @@ const RoomSelector = ({ selectedRoom, setSelectedRoom, isRoomClaimed, setIsRoomC
         )}
       </div>
 
-      {/* Room Selection */}
-      <div className="mb-6">
-        <label className="block text-gray-400 text-sm mb-2">Select Room</label>
-        {loading ? (
-          <div className="text-gray-400">Loading rooms...</div>
-        ) : (
-          <select
-            value={selectedRoom !== null ? selectedRoom : ''}
-            onChange={(e) => setSelectedRoom(e.target.value === '' ? null : parseInt(e.target.value))}
-            className="w-full bg-gray-700 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
+      {/* App Initialization */}
+      {appInitialized === false && wallet.connected && (
+        <div className="mb-6 p-4 bg-yellow-900 border border-yellow-600 rounded">
+          <h3 className="text-yellow-400 font-semibold mb-2">⚠️ App Not Initialized</h3>
+          <p className="text-yellow-300 text-sm mb-4">
+            The Tetris Streaming app needs to be initialized before you can use it. This is a one-time setup that creates the necessary program configuration.
+          </p>
+          <button
+            onClick={handleInitializeApp}
+            disabled={initializing}
+            className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded transition-colors"
           >
-            <option value="">Select a room...</option>
-            {rooms.map((room) => (
-              <option key={room.id} value={room.id}>
-                Room {room.id} - {getRoomStatus(room)}
-                {room.room_name && ` (${room.room_name})`}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+            {initializing ? 'Initializing App...' : 'Initialize App'}
+          </button>
+        </div>
+      )}
 
-      {/* Selected Room Info */}
-      {selectedRoom !== null && rooms[selectedRoom] && (
+      {/* Loading state for initialization check */}
+      {appInitialized === null && (
+        <div className="mb-6 p-4 bg-gray-700 border border-gray-600 rounded">
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-3"></div>
+            <span className="text-gray-300">Checking app status...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Room Selection */}
+      {appInitialized === true && (
+        <>
+          <div className="mb-6">
+            <label className="block text-gray-400 text-sm mb-2">Select Room</label>
+            {loading ? (
+              <div className="text-gray-400">Loading rooms...</div>
+            ) : (
+              <select
+                value={selectedRoom !== null ? selectedRoom : ''}
+                onChange={(e) => setSelectedRoom(e.target.value === '' ? null : parseInt(e.target.value))}
+                className="w-full bg-gray-700 text-white p-3 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
+              >
+                <option value="">Select a room...</option>
+                {rooms.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    Room {room.id} - {getRoomStatus(room)}
+                    {room.room_name && ` (${room.room_name})`}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Selected Room Info */}
+          {selectedRoom !== null && rooms[selectedRoom] && (
         <div className="mb-6 p-4 bg-gray-700 rounded border border-gray-600">
           <h3 className="text-white font-semibold mb-2">Room {selectedRoom} Details</h3>
           <div className="space-y-2 text-sm">
@@ -169,13 +272,40 @@ const RoomSelector = ({ selectedRoom, setSelectedRoom, isRoomClaimed, setIsRoomC
               <span className="text-white font-mono">
                 {rooms[selectedRoom].latest_chosen_piece}
               </span>
+                </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Latest Buyer:</span>
+              <span className="text-white font-mono">
+                {rooms[selectedRoom].last_buyer}
+              </span>
             </div>
+            {rooms[selectedRoom].timestamp > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Last Activity:</span>
+                <span className="text-white text-sm">
+                  {new Date(rooms[selectedRoom].timestamp * 1000).toLocaleString()}
+                </span>
+              </div>
+            )}
+            {rooms[selectedRoom].exists && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Room Status:</span>
+                <span className={getRoomExpirationStatus(rooms[selectedRoom].timestamp).color + ' text-sm font-semibold'}>
+                  {getRoomExpirationStatus(rooms[selectedRoom].timestamp).status}
+                </span>
+              </div>
+            )}
+            {rooms[selectedRoom].expired && (
+              <div className="p-2 bg-yellow-900 border border-yellow-600 rounded mt-2">
+                <span className="text-yellow-400 text-sm font-semibold">⚠️ This room has expired and can be claimed!</span>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Claim Room Form */}
-      {selectedRoom !== null && rooms[selectedRoom] && !rooms[selectedRoom].exists && wallet.connected && (
+      {selectedRoom !== null && rooms[selectedRoom] && (!rooms[selectedRoom].exists || rooms[selectedRoom].expired) && wallet.connected && (
         <div className="space-y-4">
           <div>
             <label className="block text-gray-400 text-sm mb-2">Room Name *</label>
@@ -205,22 +335,27 @@ const RoomSelector = ({ selectedRoom, setSelectedRoom, isRoomClaimed, setIsRoomC
             disabled={claimingRoom || !roomName.trim()}
             className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded transition-colors"
           >
-            {claimingRoom ? 'Claiming Room...' : 'Claim Room'}
+            {claimingRoom ? 
+              (rooms[selectedRoom]?.expired ? 'Reclaiming Room...' : 'Claiming Room...') : 
+              (rooms[selectedRoom]?.expired ? 'Reclaim Room' : 'Claim Room')
+            }
           </button>
         </div>
       )}
 
-      {/* Game Ready Status */}
-      {isRoomClaimed && (
-        <div className="mt-6 p-4 bg-green-900 border border-green-600 rounded">
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
-            <span className="text-green-400 font-semibold">Room Ready - Start Playing!</span>
-          </div>
-          <p className="text-green-300 text-sm mt-2">
-            Your game will receive piece selections from the blockchain.
-          </p>
-        </div>
+          {/* Game Ready Status */}
+          {isRoomClaimed && (
+            <div className="mt-6 p-4 bg-green-900 border border-green-600 rounded">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
+                <span className="text-green-400 font-semibold">Room Ready - Start Playing!</span>
+              </div>
+              <p className="text-green-300 text-sm mt-2">
+                Your game will receive piece selections from the blockchain.
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
