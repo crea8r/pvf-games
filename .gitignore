@@ -9,6 +9,7 @@ test-ledger
 node_modules
 
 .next
+**/.next
 
 # Rust/Cargo generated files
 debug
