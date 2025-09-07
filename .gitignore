@@ -8,6 +8,8 @@ test-ledger
 # Node.js
 node_modules
 
+.next
+
 # Rust/Cargo generated files
 debug
 **/*.rs.bk
