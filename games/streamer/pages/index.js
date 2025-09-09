@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
-import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl } from '@solana/web3.js';
+import { NETWORK } from '../lib/solana';
 
 // Import wallet adapter CSS
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -34,17 +34,17 @@ function HomeContent() {
   const [gameStarted, setGameStarted] = useState(false);
 
   // Wallet configuration
-  // const network = WalletAdapterNetwork.Devnet;
-  // const endpoint = useMemo(() => clusterApiUrl(network), [network]);
-  const network = 'http://127.0.0.1:8899';
-  const endpoint = useMemo(() => 'http://127.0.0.1:8899');
+  const endpoint = useMemo(() =>
+    NETWORK.indexOf('http') === -1 ? clusterApiUrl(NETWORK) : NETWORK,
+    [NETWORK]
+  );
   
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter(),
-      new SolflareWalletAdapter({ network }),
+      new SolflareWalletAdapter({ NETWORK }),
     ],
-    [network]
+    [NETWORK]
   );
 
   // Mode Selection Screen
@@ -178,7 +178,7 @@ function HomeContent() {
                   
                   {gameMode === 'streamer' && (
                     <div className="text-sm text-gray-400">
-                      Solana Devnet
+                      {NETWORK}
                     </div>
                   )}
                 </div>

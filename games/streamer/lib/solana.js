@@ -10,6 +10,7 @@ import programHook from '../utils/program';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { createInitializeInstruction } from '../utils/createInitializeInstruction';
 import { Buffer } from 'buffer';
+import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 // Program constants
 export const PROGRAM_ID = new PublicKey(
   'FHbWQGzgrdKnuZcp4bLhE2GdwzxrGciWKUegW42yj33h'
@@ -21,7 +22,9 @@ export const PIECE_PRICE = 1_000_000; // 0.001 SOL in lamports
 export const ROOMS_COUNT = 10;
 
 // Connection setup - use localhost for development
-export const connection = new Connection('http://localhost:8899', 'confirmed');
+export const NETWORK = WalletAdapterNetwork.Devnet;
+// export const NETWORK = 'http://127.0.0.1:8899';
+export const connection = new Connection(NETWORK.indexOf('http') === -1 ? clusterApiUrl(NETWORK) : NETWORK, 'confirmed');
 
 // Get room PDA (Program Derived Address)
 export function getRoomPDA(roomId) {

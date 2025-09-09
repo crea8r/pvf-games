@@ -26,6 +26,7 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed, gameMode = 'normal', onGameSt
   const [gameStarted, setGameStarted] = useState(false);
   const [nextPieceFromBlockchain, setNextPieceFromBlockchain] = useState(false);
   const [roomData, setRoomData] = useState(null);
+  const [lastSeenTimestamp, setLastSeenTimestamp] = useState(null);
 
   const gameLoopRef = useRef();
   const blockchainPollRef = useRef();
@@ -152,7 +153,7 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed, gameMode = 'normal', onGameSt
 
   // Blockchain polling
   const pollBlockchain = useCallback(async () => {
-    if (gameMode !== 'streamer' || selectedRoom === null || !isRoomClaimed || gameOver) return;
+    if (gameMode !== 'streamer' || selectedRoom === null || !isRoomClaimed || gameOver || !gameStarted) return;
     
     console.log('Polling blockchain for room:', selectedRoom);
     try {
@@ -160,27 +161,43 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed, gameMode = 'normal', onGameSt
       console.log('Fetched room data:', data);
       setRoomData(data);
       
-      if (data.latest_chosen_piece !== undefined && data.latest_chosen_piece !== null) {
-        const blockchainPieceType = getPieceFromBlockchain(data.latest_chosen_piece);
-        // Update next piece if we have a valid blockchain piece and it's different
-        if (blockchainPieceType && blockchainPieceType !== nextPieceType) {
-          setNextPieceType(blockchainPieceType);
-          setNextPieceFromBlockchain(true);
-          console.log('Updated next piece from blockchain:', blockchainPieceType);
+      if (data.latest_chosen_piece !== undefined && data.latest_chosen_piece !== null && data.timestamp) {
+        const currentTimestamp = data.timestamp;
+        
+        // Check if we have new blockchain data (different timestamp)
+        if (lastSeenTimestamp === null || currentTimestamp > lastSeenTimestamp) {
+          // New blockchain data - use the blockchain piece
+          const blockchainPieceType = getPieceFromBlockchain(data.latest_chosen_piece);
+          if (blockchainPieceType) {
+            setNextPieceType(blockchainPieceType);
+            setNextPieceFromBlockchain(true);
+            setLastSeenTimestamp(currentTimestamp);
+            console.log('Updated next piece from blockchain (new timestamp):', blockchainPieceType, 'timestamp:', currentTimestamp);
+          }
+        } else {
+          // Same timestamp - don't change the piece, let spawnNewPiece handle it
+          console.log('Blockchain data unchanged, keeping current next piece:', nextPieceType, 'timestamp:', currentTimestamp);
         }
+      } else {
+        // No blockchain data - don't change the piece, let spawnNewPiece handle it
+        console.log('No blockchain data, keeping current next piece:', nextPieceType);
       }
     } catch (error) {
       console.error('Error polling blockchain:', error);
-      // Don't clear the next piece on error, keep existing one
+      // Don't change the piece on error, let spawnNewPiece handle it
     }
-  }, [selectedRoom, isRoomClaimed, gameMode, nextPieceType, gameOver]);
+  }, [selectedRoom, isRoomClaimed, gameMode, lastSeenTimestamp, gameOver, gameStarted]);
+
+  // Board click handler to start game
+  const handleBoardClick = useCallback(() => {
+    if (!gameStarted) {
+      initializeGame();
+    }
+  }, [gameStarted, initializeGame]);
 
   // Keyboard controls
   const handleKeyPress = useCallback((event) => {
     if (!gameStarted) {
-      if (event.key === ' ' || event.key === 'Enter') {
-        initializeGame();
-      }
       return;
     }
     
@@ -229,7 +246,7 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed, gameMode = 'normal', onGameSt
   }, [gameLoop]);
 
   useEffect(() => {
-    if (gameMode === 'streamer' && selectedRoom !== null && isRoomClaimed) {
+    if (gameMode === 'streamer' && selectedRoom !== null && isRoomClaimed && gameStarted) {
       console.log('Starting blockchain polling for room:', selectedRoom);
       blockchainPollRef.current = setInterval(pollBlockchain, 2000);
       // Call immediately once
@@ -239,7 +256,7 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed, gameMode = 'normal', onGameSt
         clearInterval(blockchainPollRef.current);
       };
     }
-  }, [pollBlockchain, selectedRoom, isRoomClaimed, gameMode]);
+  }, [pollBlockchain, selectedRoom, isRoomClaimed, gameMode, gameStarted]);
 
   // Event listeners
   useEffect(() => {
@@ -279,19 +296,22 @@ const TetrisGame = ({ selectedRoom, isRoomClaimed, gameMode = 'normal', onGameSt
           <GameBoard 
             board={board} 
             currentPiece={currentPiece} 
-            gameOver={gameOver} 
+            gameOver={gameOver}
           />
           
           {/* Start Game Overlay */}
           {!gameStarted && (
             <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center rounded-lg">
               <div className="text-center">
-                <div className="text-white text-xl font-bold mb-2">
+                <div className="text-white text-xl font-bold mb-4">
                   {gameOver ? 'Game Over!' : 'Tetris'}
                 </div>
-                <div className="text-gray-300 text-sm">
-                  Press SPACE or ENTER to start
-                </div>
+                <button 
+                  onClick={handleBoardClick}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Start Game
+                </button>
               </div>
             </div>
           )}
